@@ -1,7 +1,7 @@
 import { env as globalEnv } from "cloudflare:workers";
 import {
+  acquire,
   connect,
-  launch,
   type GetLiveViewResponse,
 } from "@cloudflare/playwright";
 import { createMcpAgent } from "@cloudflare/playwright-mcp";
@@ -93,7 +93,9 @@ async function startLiveSession(request: Request, env: Env): Promise<Response> {
   const body = await readJson<{ url?: string }>(request);
   const targetUrl = normalizeTargetUrl(body.url);
 
-  const browser = await launch(env.BROWSER, { keep_alive: KEEP_ALIVE_MS });
+  const { sessionId } = await acquire(env.BROWSER, { keep_alive: KEEP_ALIVE_MS });
+  const browser = await connect(env.BROWSER, sessionId);
+
   try {
     const context = browser.contexts()[0] ?? (await browser.newContext());
     const page = context.pages()[0] ?? (await context.newPage());
@@ -103,9 +105,7 @@ async function startLiveSession(request: Request, env: Env): Promise<Response> {
     });
 
     const liveViewUrl = await createLiveView(page);
-    const sessionId = browser.sessionId();
-
-    return json({
+    const result = {
       ok: true,
       sessionId,
       liveViewUrl,
@@ -113,8 +113,12 @@ async function startLiveSession(request: Request, env: Env): Promise<Response> {
       title: await page.title(),
       keepAliveMs: KEEP_ALIVE_MS,
       liveViewExpiresMs: LIVE_VIEW_EXPIRES_MS,
-      next: "Open liveViewUrl, log in manually, then call /api/live/inspect with the same sessionId.",
-    });
+      sessionMode: "acquire+connect",
+      next: "Open liveViewUrl immediately. The Worker has disconnected but the Browser Run session remains alive for reconnect.",
+    };
+
+    await browser.close();
+    return json(result);
   } catch (error) {
     await browser.close().catch(() => undefined);
     throw error;
