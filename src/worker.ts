@@ -1,5 +1,6 @@
 import puppeteer from "@cloudflare/puppeteer";
 import legacyWorker from "./index";
+export { PlaywrightMCP } from "./index";
 
 declare global {
   interface Env {
@@ -89,8 +90,6 @@ async function startLiveSession(request: Request, env: Env): Promise<Response> {
     const liveViewUrl = await createLiveView(page);
     const sessionId = browser.sessionId();
 
-    // Critical: disconnect frees only this Worker/CDP client connection while
-    // preserving the remote Browser Run session. browser.close() would kill it.
     browser.disconnect();
 
     return json({
