@@ -1,0 +1,2 @@
+# Local development only. Do not commit real secrets.
+BRIDGE_TOKEN=replace-with-a-long-random-value
